@@ -63,8 +63,9 @@ async def handle_session_flow(event):
     # Step: Phone input
     if state["step"] == "awaiting_phone":
         state["phone"] = text
-        state["session"] = StringSession()
-        state["client"] = TelegramClient(state["session"], BOT_API_ID, BOT_API_HASH)
+        session_obj = StringSession()
+        state["client"] = TelegramClient(session_obj, BOT_API_ID, BOT_API_HASH)
+        state["session"] = session_obj
         client = state["client"]
 
         try:
@@ -117,27 +118,27 @@ async def finalize_session(user_id, event):
     state = user_states[user_id]
     client = state["client"]
 
-    if not client.is_connected():
-        await client.connect()
-
     try:
+        if not client.is_connected():
+            await client.connect()
+
+        if not await client.is_user_authorized():
+            raise Exception("Client is not authorized.")
+
         me = await client.get_me()
         if me is None:
-            raise Exception("Failed to retrieve user info.")
+            raise Exception("Failed to get user info.")
 
         session_string = client.session.save()
         if session_string is None:
-            raise Exception("Session string is None.")
+            raise Exception("Failed to create session string.")
 
-        username = me.username or f"user{me.id}"
-        session_name = f"{me.id}_{username}"
+        # Save .session file (binary) and string session (base64)
+        session_name = f"{me.id}_{me.username or 'user'}"
         session_path = os.path.join(ACCOUNTS_DIR, f"{session_name}.session")
 
-        # Save session to file
-        with open(session_path, "wb") as f:
-            client.session.save(f)
+        await client.session.save_to_file(session_path)
 
-        # Save to config
         if session_name not in config["accounts"]:
             config["accounts"].append(session_name)
             save_config(config)
