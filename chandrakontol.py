@@ -23,7 +23,7 @@ os.makedirs(ACCOUNTS_DIR, exist_ok=True)
 
 def load_config():
     if not os.path.exists(CONFIG_PATH):
-        return {"admins": [123456789], "groups": [], "accounts": []}  # Replace with your Telegram user ID
+        return {"admins": [5087266104], "groups": [], "accounts": []}  # Replace with your Telegram user ID
     with open(CONFIG_PATH, "r") as f:
         return json.load(f)
 
