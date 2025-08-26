@@ -1,8 +1,30 @@
 import asyncio
+import sys
 import json
 import os
 import random
-import sys
+
+# === Patch for Python 3.10+ asyncio event loop issue ===
+if sys.version_info >= (3, 10):
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+_original_get_event_loop = asyncio.get_event_loop
+
+def patched_get_event_loop():
+    try:
+        return _original_get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        return loop
+
+asyncio.get_event_loop = patched_get_event_loop
+
+# === Now import the rest ===
 from telethon import TelegramClient, events, Button
 from telethon.sessions import StringSession
 from telethon.errors import (
@@ -12,26 +34,19 @@ from telethon.errors import (
 )
 from telethon.tl.functions.messages import GetHistoryRequest
 
-# === Fix for Python 3.10+ event loop issue (mostly redundant with asyncio.run) ===
-if sys.version_info >= (3, 10):
-    try:
-        asyncio.get_running_loop()
-    except RuntimeError:
-        asyncio.set_event_loop(asyncio.new_event_loop())
-
-# === Configuration - replace these with your real credentials ===
+# === Replace these with your real credentials ===
 BOT_API_ID = 24565808
 BOT_API_HASH = "4eb74502af26e86c3571225a29243e3e"
-BOT_TOKEN = "7802435088:AAHcwYbO1nFpz4jZljkwy4Xm9Nr9GRfpV2Y"  # <--- Replace with your Bot Token from BotFather
+BOT_TOKEN = "7802435088:AAHcwYbO1nFpz4jZljkwy4Xm9Nr9GRfpV2Y"   # <--- Replace with your Bot Token from BotFather
 
 CONFIG_PATH = "config.json"
 ACCOUNTS_DIR = "accounts"
-
 os.makedirs(ACCOUNTS_DIR, exist_ok=True)
 
 def load_config():
     if not os.path.exists(CONFIG_PATH):
-        return {"admins": [5087266104], "groups": [], "accounts": []}  # Replace with your Telegram ID
+        # Put your Telegram user ID in admins below
+        return {"admins": [123456789], "groups": [], "accounts": []}
     with open(CONFIG_PATH, "r") as f:
         return json.load(f)
 
@@ -43,17 +58,14 @@ config = load_config()
 admins = config.get("admins", [])
 user_states = {}
 
-# === Create bot client ===
 bot = TelegramClient("bot_controller", BOT_API_ID, BOT_API_HASH).start(bot_token=BOT_TOKEN)
 
-# === /start command ===
 @bot.on(events.NewMessage(pattern="/start"))
 async def start(event):
     if event.sender_id not in admins:
         return await event.reply("🚫 You are not authorized.")
-    await event.reply("✅ Welcome!\n\nCommands:\n- /gen\n- /addgroup\n- /removegroup")
+    await event.reply("✅ Welcome to the userbot manager.\n\nCommands:\n- /gen\n- /addgroup\n- /removegroup")
 
-# === /gen command to create session ===
 @bot.on(events.NewMessage(pattern="/gen"))
 async def gen_session_handler(event):
     if event.sender_id not in admins:
@@ -120,7 +132,6 @@ async def finalize_session(user_id, event):
     session_name = f"{me.id}_{me.username or 'user'}"
     session_path = os.path.join(ACCOUNTS_DIR, f"{session_name}.session")
 
-    # Save session file
     with open(session_path, "wb") as f:
         client.session.save(f)
 
@@ -164,9 +175,9 @@ async def add_group(event):
     if group_id not in config["groups"]:
         config["groups"].append(group_id)
         save_config(config)
-        await event.reply("✅ Group added.")
+        await event.reply("✅ Group added to forwarding targets.")
     else:
-        await event.reply("⚠️ Already added.")
+        await event.reply("⚠️ Group is already in the list.")
 
 @bot.on(events.NewMessage(pattern=r"^/removegroup"))
 async def remove_group(event):
@@ -178,9 +189,9 @@ async def remove_group(event):
     if group_id in config["groups"]:
         config["groups"].remove(group_id)
         save_config(config)
-        await event.reply("✅ Removed.")
+        await event.reply("✅ Group removed from forwarding list.")
     else:
-        await event.reply("⚠️ Not found.")
+        await event.reply("⚠️ Group was not in the list.")
 
 async def auto_forwarder(session_name):
     session_path = os.path.join(ACCOUNTS_DIR, f"{session_name}.session")
@@ -189,8 +200,15 @@ async def auto_forwarder(session_name):
 
     while True:
         try:
-            messages = await client(GetHistoryRequest(peer='me', limit=20, offset_id=0,
-                                                      max_id=0, min_id=0, add_offset=0, hash=0))
+            messages = await client(GetHistoryRequest(
+                peer='me',
+                limit=20,
+                offset_id=0,
+                max_id=0,
+                min_id=0,
+                add_offset=0,
+                hash=0
+            ))
             if not messages.messages:
                 await asyncio.sleep(60)
                 continue
