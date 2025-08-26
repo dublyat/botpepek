@@ -208,7 +208,7 @@ async def main():
     await bot.start()
     print("✅ Bot is running.")
     tasks = [asyncio.create_task(auto_forwarder(session)) for session in config["accounts"]]
-    await asyncio.gather(*tasks)
+    await asyncio.gather(*tasks, bot.run_until_disconnected())
 
 if __name__ == "__main__":
     asyncio.run(main())
