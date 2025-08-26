@@ -1,30 +1,8 @@
 import asyncio
-import sys
 import json
 import os
 import random
 
-# === Patch for Python 3.10+ asyncio event loop issue ===
-if sys.version_info >= (3, 10):
-    try:
-        asyncio.get_running_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
-_original_get_event_loop = asyncio.get_event_loop
-
-def patched_get_event_loop():
-    try:
-        return _original_get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        return loop
-
-asyncio.get_event_loop = patched_get_event_loop
-
-# === Now import the rest ===
 from telethon import TelegramClient, events, Button
 from telethon.sessions import StringSession
 from telethon.errors import (
@@ -34,19 +12,18 @@ from telethon.errors import (
 )
 from telethon.tl.functions.messages import GetHistoryRequest
 
-# === Replace these with your real credentials ===
 BOT_API_ID = 24565808
 BOT_API_HASH = "4eb74502af26e86c3571225a29243e3e"
-BOT_TOKEN = "7802435088:AAHcwYbO1nFpz4jZljkwy4Xm9Nr9GRfpV2Y"   # <--- Replace with your Bot Token from BotFather
+BOT_TOKEN = "7802435088:AAHcwYbO1nFpz4jZljkwy4Xm9Nr9GRfpV2Y" 
 
-CONFIG_PATH = "config.json"
+# === Storage Setup ===
 ACCOUNTS_DIR = "accounts"
+CONFIG_PATH = "config.json"
 os.makedirs(ACCOUNTS_DIR, exist_ok=True)
 
 def load_config():
     if not os.path.exists(CONFIG_PATH):
-        # Put your Telegram user ID in admins below
-        return {"admins": [123456789], "groups": [], "accounts": []}
+        return {"admins": [123456789], "groups": [], "accounts": []}  # Replace with your Telegram user ID
     with open(CONFIG_PATH, "r") as f:
         return json.load(f)
 
@@ -58,7 +35,8 @@ config = load_config()
 admins = config.get("admins", [])
 user_states = {}
 
-bot = TelegramClient("bot_controller", BOT_API_ID, BOT_API_HASH).start(bot_token=BOT_TOKEN)
+# === Bot Client ===
+bot = TelegramClient("bot_controller", BOT_API_ID, BOT_API_HASH)
 
 @bot.on(events.NewMessage(pattern="/start"))
 async def start(event):
@@ -226,10 +204,12 @@ async def auto_forwarder(session_name):
             print(f"[{session_name}] Error: {e}")
             await asyncio.sleep(120)
 
-async def start_all():
+async def main():
     await bot.start()
+    print("✅ Bot is running.")
     tasks = [asyncio.create_task(auto_forwarder(session)) for session in config["accounts"]]
     await asyncio.gather(*tasks)
 
 if __name__ == "__main__":
-    asyncio.run(start_all())
+    asyncio.run(main())
+
