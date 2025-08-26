@@ -14,7 +14,7 @@ from telethon.tl.functions.messages import GetHistoryRequest
 
 BOT_API_ID = 24565808
 BOT_API_HASH = "4eb74502af26e86c3571225a29243e3e"
-BOT_TOKEN = "7802435088:AAHcwYbO1nFpz4jZljkwy4Xm9Nr9GRfpV2Y" 
+BOT_TOKEN = "7802435088:AAEcSF35eqbRycmia0sHs_Xw7O5DeBmxzrc" 
 
 # === Storage Setup ===
 ACCOUNTS_DIR = "accounts"
