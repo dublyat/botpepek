@@ -117,24 +117,42 @@ async def finalize_session(user_id, event):
     state = user_states[user_id]
     client = state["client"]
 
-    me = await client.get_me()
-    session_name = f"{me.id}_{me.username or 'user'}"
-    session_path = os.path.join(ACCOUNTS_DIR, f"{session_name}.session")
+    if not client.is_connected():
+        await client.connect()
 
-    with open(session_path, "wb") as f:
-        client.session.save(f)
+    try:
+        me = await client.get_me()
+        if me is None:
+            raise Exception("Failed to retrieve user info.")
 
-    if session_name not in config["accounts"]:
-        config["accounts"].append(session_name)
-        save_config(config)
+        session_string = client.session.save()
+        if session_string is None:
+            raise Exception("Session string is None.")
 
-    await client.disconnect()
-    user_states.pop(user_id)
+        username = me.username or f"user{me.id}"
+        session_name = f"{me.id}_{username}"
+        session_path = os.path.join(ACCOUNTS_DIR, f"{session_name}.session")
 
-    await event.respond(
-        f"✅ Session saved for {me.first_name} (@{me.username or 'N/A'})\n\nClick to reveal the string session:",
-        buttons=[Button.inline("🔑 Reveal String", data=f"show_string:{session_name}")]
-    )
+        # Save session to file
+        with open(session_path, "wb") as f:
+            client.session.save(f)
+
+        # Save to config
+        if session_name not in config["accounts"]:
+            config["accounts"].append(session_name)
+            save_config(config)
+
+        await client.disconnect()
+        user_states.pop(user_id)
+
+        await event.respond(
+            f"✅ Session saved for {me.first_name} (@{me.username or 'N/A'})\n\nClick to reveal the string session:",
+            buttons=[Button.inline("🔑 Reveal String", data=f"show_string:{session_name}")]
+        )
+    except Exception as e:
+        await event.reply(f"❌ Error during finalization: {e}")
+        user_states.pop(user_id)
+
 
 @bot.on(events.CallbackQuery(data=lambda d: d.decode().startswith("show_string:")))
 async def reveal_string(event):
